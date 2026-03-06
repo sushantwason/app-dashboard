@@ -29,7 +29,7 @@
   .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px; }
   .metric-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 22px; position: relative; overflow: hidden; }
   .metric-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent, #7c8cf8), transparent); }
-  .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #6666880; margin-bottom: 8px; color: #8888aa; }
+  .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #8888aa; margin-bottom: 8px; }
   .metric-value { font-size: 32px; font-weight: 700; color: #f0f0ff; }
   .metric-change { font-size: 13px; margin-top: 4px; font-weight: 500; }
   .metric-change.positive { color: #4ade80; }
@@ -90,6 +90,13 @@
   .insight-callout h3 { color: #a78bfa; font-size: 14px; margin-bottom: 10px; font-weight: 600; }
   .insight-callout p { color: #b0b0cc; font-size: 13px; line-height: 1.7; }
 
+  /* Loading */
+  .loading { display: flex; align-items: center; justify-content: center; min-height: 400px; flex-direction: column; gap: 16px; }
+  .loading .spinner { width: 40px; height: 40px; border: 3px solid rgba(124,140,248,0.2); border-top-color: #7c8cf8; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading p { color: #8888aa; font-size: 14px; }
+  .error-msg { color: #f87171; text-align: center; padding: 40px; font-size: 14px; }
+
   @media (max-width: 900px) {
     .metric-grid { grid-template-columns: repeat(2, 1fr); }
     .chart-row, .status-row, .strategy-grid { grid-template-columns: 1fr; }
@@ -103,7 +110,7 @@
   <div>
     <h1>Sushant's Daily Dashboard</h1>
     <div class="date" id="currentDate"></div>
-    <div class="refresh-note">Data period: Feb 3 â Mar 4, 2026 Â· Source: App Store Connect</div>
+    <div class="refresh-note" id="dataPeriod">Loading data...</div>
   </div>
   <div style="text-align:right">
     <div style="font-size:13px;color:#8888aa;">Sushant Wason</div>
@@ -120,112 +127,35 @@
     <button class="tab" onclick="switchTab('strategy')">Growth Strategy</button>
   </div>
 
+  <!-- Loading State -->
+  <div id="loading" class="loading">
+    <div class="spinner"></div>
+    <p>Loading dashboard data...</p>
+  </div>
+
+  <!-- Error State -->
+  <div id="error" class="error-msg" style="display:none"></div>
+
   <!-- ============ PATCHPAL TAB ============ -->
-  <div class="tab-content active" id="tab-patchpal">
+  <div class="tab-content active" id="tab-patchpal" style="display:none">
 
     <!-- Last 24h Snapshot -->
-    <div class="metric-grid" style="margin-bottom:20px">
-      <div class="metric-card" style="--accent:#38bdf8;border:1px solid rgba(56,189,248,0.2)">
-        <div class="metric-label">Installs (Last 24h)</div>
-        <div class="metric-value" id="installs24h">1</div>
-        <div class="metric-change neutral">Mar 4</div>
-        <div class="metric-sub">7-day avg: 4.3/day</div>
-      </div>
-      <div class="metric-card" style="--accent:#a78bfa;border:1px solid rgba(167,139,250,0.2)">
-        <div class="metric-label">App Opens (Last 24h)</div>
-        <div class="metric-value" id="sessions24h">0</div>
-        <div class="metric-change neutral">Mar 4 (Opt-in Only)</div>
-        <div class="metric-sub">7-day avg: 8.1/day</div>
-      </div>
-      <div class="metric-card" style="--accent:#4ade80;border:1px solid rgba(74,222,128,0.2)">
-        <div class="metric-label">Avg Opens / User</div>
-        <div class="metric-value">6.28</div>
-        <div class="metric-change positive">+0.4%</div>
-        <div class="metric-sub">157 sessions &divide; 25 active devices</div>
-      </div>
-      <div class="metric-card" style="--accent:#666680;border:1px solid rgba(102,102,128,0.2)">
-        <div class="metric-label">Avg Session Duration</div>
-        <div class="metric-value" style="font-size:22px;color:#666680">&mdash;</div>
-        <div class="metric-change neutral">Not available</div>
-        <div class="metric-sub">Requires Firebase / Mixpanel SDK</div>
-      </div>
-    </div>
+    <div class="metric-grid" style="margin-bottom:20px" id="snapshot24h"></div>
 
     <!-- Key Insight -->
-    <div class="insight-callout">
+    <div class="insight-callout" id="keyInsight">
       <h3>Key Insight</h3>
-      <p>PatchPal saw a massive spike on Feb 24-25 (55 + 29 downloads) driven primarily by <strong>App Referrer traffic (76.9%)</strong>. Since then, daily downloads have dropped to 1-5/day. The spike suggests a feature or social share drove installs â your challenge is replicating that momentum with sustained acquisition channels like ASO and paid ads.</p>
+      <p id="keyInsightText"></p>
     </div>
 
     <!-- Metric Cards -->
-    <div class="metric-grid">
-      <div class="metric-card" style="--accent:#7c8cf8">
-        <div class="metric-label">Impressions</div>
-        <div class="metric-value">706</div>
-        <div class="metric-change positive">+85%</div>
-      </div>
-      <div class="metric-card" style="--accent:#a78bfa">
-        <div class="metric-label">Product Page Views</div>
-        <div class="metric-value">337</div>
-        <div class="metric-change positive">+811%</div>
-      </div>
-      <div class="metric-card" style="--accent:#4ade80">
-        <div class="metric-label">Conversion Rate</div>
-        <div class="metric-value">26.1%</div>
-        <div class="metric-change positive">+768%</div>
-        <div class="metric-sub">Daily Average</div>
-      </div>
-      <div class="metric-card" style="--accent:#38bdf8">
-        <div class="metric-label">Total Downloads</div>
-        <div class="metric-value">130</div>
-        <div class="metric-change positive">+1,530%</div>
-      </div>
-    </div>
-
-    <div class="metric-grid">
-      <div class="metric-card" style="--accent:#f87171">
-        <div class="metric-label">Proceeds</div>
-        <div class="metric-value">$0</div>
-        <div class="metric-change neutral">0%</div>
-      </div>
-      <div class="metric-card" style="--accent:#facc15">
-        <div class="metric-label">Sessions / Active Device</div>
-        <div class="metric-value">6.28</div>
-        <div class="metric-change positive">+0.4%</div>
-        <div class="metric-sub">Opt-in Only</div>
-      </div>
-      <div class="metric-card" style="--accent:#f87171">
-        <div class="metric-label">Crashes</div>
-        <div class="metric-value">4</div>
-        <div class="metric-change positive">-20%</div>
-      </div>
-      <div class="metric-card" style="--accent:#4ade80">
-        <div class="metric-label">Retention</div>
-        <div class="metric-value">â</div>
-        <div class="metric-change neutral">Not enough data</div>
-        <div class="metric-sub">Need more opt-in users</div>
-      </div>
-    </div>
+    <div class="metric-grid" id="metricsRow1"></div>
+    <div class="metric-grid" id="metricsRow2"></div>
 
     <!-- Conversion Funnel -->
-    <div class="chart-card" style="margin-bottom:24px">
+    <div class="chart-card" style="margin-bottom:24px" id="funnelCard">
       <h3>Conversion Funnel</h3>
-      <div class="funnel">
-        <div class="funnel-step">
-          <div class="funnel-label">Impressions</div>
-          <div class="funnel-bar" style="width:100%;background:linear-gradient(90deg,#7c8cf8,#6366f1)">706</div>
-        </div>
-        <div class="funnel-step">
-          <div class="funnel-label">Page Views</div>
-          <div class="funnel-bar" style="width:47.7%;background:linear-gradient(90deg,#a78bfa,#8b5cf6)">337</div>
-          <div class="funnel-value">47.7% of impressions</div>
-        </div>
-        <div class="funnel-step">
-          <div class="funnel-label">Downloads</div>
-          <div class="funnel-bar" style="width:18.4%;background:linear-gradient(90deg,#4ade80,#22c55e)">130</div>
-          <div class="funnel-value">38.6% of page views</div>
-        </div>
-      </div>
+      <div class="funnel" id="funnel"></div>
     </div>
 
     <!-- Charts Row -->
@@ -252,175 +182,20 @@
     </div>
 
     <!-- App Status -->
-    <div class="status-row">
-      <div class="status-card">
-        <h3 style="color:#4ade80">PatchPal Status</h3>
-        <table class="data-table">
-          <tr><td>Current Live Version</td><td style="color:#e0e0f0;font-weight:600">Older release (live on App Store)</td></tr>
-          <tr><td>Next Version</td><td style="color:#e0e0f0;font-weight:600">1.2.3 <span class="status-badge badge-prep">Prepare for Submission</span></td></tr>
-          <tr><td>Platform</td><td>iOS</td></tr>
-          <tr><td>Primary Device</td><td>iPhone (97.7%)</td></tr>
-        </table>
-      </div>
-      <div class="status-card">
-        <h3 style="color:#facc15">Daily Checklist</h3>
-        <table class="data-table">
-          <tr><td>1.</td><td>Check yesterday's downloads vs. 7-day average</td></tr>
-          <tr><td>2.</td><td>Monitor crash count (target: 0)</td></tr>
-          <tr><td>3.</td><td>Review App Store Search rankings</td></tr>
-          <tr><td>4.</td><td>Check conversion rate trend</td></tr>
-          <tr><td>5.</td><td>Respond to any new reviews</td></tr>
-          <tr><td>6.</td><td>Check MealSight review status</td></tr>
-        </table>
-      </div>
-    </div>
-
+    <div class="status-row" id="statusRow"></div>
   </div>
 
   <!-- ============ MEALSIGHT TAB ============ -->
-  <div class="tab-content" id="tab-mealsight">
-
-    <div class="pending-panel">
-      <div class="pending-icon">&#9203;</div>
-      <h3>MealSight - AI Food Scanner</h3>
-      <p style="font-size:16px;margin-bottom:16px;">iOS 1.0 â Waiting for Review</p>
-      <p>Submitted today (Mar 5, 2026) by Sushant Wason. Apple typically reviews within 24-48 hours.<br>
-      Previous submissions on Friday were removed. This is the active submission.</p>
-      <div style="margin-top:24px;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;">
-        <table class="data-table">
-          <tr><td>App Name</td><td style="color:#e0e0f0;font-weight:600">MealSight - AI Food Scanner</td></tr>
-          <tr><td>Version</td><td>iOS 1.0</td></tr>
-          <tr><td>Status</td><td><span class="status-badge badge-review">Waiting for Review</span></td></tr>
-          <tr><td>Submitted</td><td>Today at 3:28 PM</td></tr>
-          <tr><td>Draft Submissions</td><td>3 (from Feb 25, via API)</td></tr>
-          <tr><td>Previous Attempts</td><td>2 removed (Friday)</td></tr>
-        </table>
-      </div>
-    </div>
-
-    <div class="strategy-section" style="margin-top:32px">
-      <h2>Pre-Launch Checklist for MealSight</h2>
-      <div class="strategy-grid">
-        <div class="strategy-card">
-          <div class="priority priority-high">BEFORE APPROVAL</div>
-          <h4>Prepare ASO Assets</h4>
-          <p>Optimize your App Store listing: refine keywords targeting "food scanner", "calorie tracker", "meal logging AI". Your screenshots look good â make sure the first 3 tell a clear story since those show on search results.</p>
-        </div>
-        <div class="strategy-card">
-          <div class="priority priority-high">BEFORE APPROVAL</div>
-          <h4>Pre-Seed Reviews</h4>
-          <p>Line up 10-15 TestFlight beta users who can leave Day 1 reviews. Early ratings heavily influence your initial ranking and conversion rate.</p>
-        </div>
-        <div class="strategy-card">
-          <div class="priority priority-medium">LAUNCH WEEK</div>
-          <h4>Cross-Promote from PatchPal</h4>
-          <p>PatchPal has 130+ users who opted into a health-related app. Add a subtle in-app card or notification promoting MealSight â this is your warmest audience.</p>
-        </div>
-        <div class="strategy-card">
-          <div class="priority priority-medium">LAUNCH WEEK</div>
-          <h4>Social Launch Campaign</h4>
-          <p>Prepare a launch thread for X/Twitter, a Product Hunt listing, and Reddit posts in r/nutrition, r/loseit, r/fitness. Health/food apps do well with community-driven launches.</p>
-        </div>
-      </div>
-    </div>
-  </div>
+  <div class="tab-content" id="tab-mealsight"></div>
 
   <!-- ============ STRATEGY TAB ============ -->
-  <div class="tab-content" id="tab-strategy">
-
-    <div class="insight-callout">
-      <h3>Strategic Overview</h3>
-      <p>PatchPal is showing strong signals: 26.1% conversion rate is excellent (App Store average is ~3-5%), and 6.28 sessions per device indicates genuine engagement. The challenge is <strong>sustained discovery</strong> â 76.9% of downloads come from App Referrer (likely direct links you shared), with only 15.4% from organic App Store Search. Your growth lever is increasing organic discovery while maintaining that high conversion rate.</p>
-    </div>
-
-    <h2 style="font-size:18px;font-weight:700;color:#f87171;margin-bottom:16px;">Immediate Actions (This Week)</h2>
-    <div class="strategy-grid" style="margin-bottom:32px">
-      <div class="strategy-card">
-        <div class="priority priority-high">HIGH IMPACT</div>
-        <h4>ASO Overhaul for PatchPal</h4>
-        <p>Only 15.4% of downloads come from App Store Search. Target keywords like "patch reminder", "medication patch tracker", "NRT tracker", "nicotine patch app". Add these to your subtitle and keyword field. Your 26% conversion rate means people who find you convert â you just need more people to find you.</p>
-        <div class="impact">Expected impact: 2-3x organic search downloads within 2-4 weeks</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-high">HIGH IMPACT</div>
-        <h4>Replicate the Feb 24 Spike</h4>
-        <p>55 downloads in one day from App Referrer â something worked. Was it a social post? A community share? Reddit? Identify what drove that spike and systematize it: schedule weekly posts, create shareable content, partner with health communities.</p>
-        <div class="impact">Expected impact: Recurring 20-30 download days instead of 1-5</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-high">REVENUE</div>
-        <h4>Implement Monetization</h4>
-        <p>$0 proceeds with 130 downloads and 6.28 sessions/device is a missed opportunity. Consider: a premium "insights" tier ($2.99/mo), a one-time unlock for advanced features ($4.99), or a "PatchPal Pro" subscription with detailed analytics and reminders.</p>
-        <div class="impact">Even 5% conversion at $2.99/mo = potential $19.40 MRR from current users</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-high">STABILITY</div>
-        <h4>Fix All 4 Crashes</h4>
-        <p>4 crashes in the reporting period isn't terrible, but for a health app, stability is trust. Each crash is a potential uninstall. Prioritize crash-free releases â aim for 99.9% crash-free sessions before scaling acquisition.</p>
-        <div class="impact">Expected impact: Improved retention and App Store rating</div>
-      </div>
-    </div>
-
-    <h2 style="font-size:18px;font-weight:700;color:#facc15;margin-bottom:16px;">Medium-Term Plays (Next 2-4 Weeks)</h2>
-    <div class="strategy-grid" style="margin-bottom:32px">
-      <div class="strategy-card">
-        <div class="priority priority-medium">GROWTH</div>
-        <h4>Apple Search Ads â Start Small</h4>
-        <p>With 26.1% conversion rate, paid search will be very efficient. Start with $5-10/day targeting your exact keywords. At this conversion rate, your CPI could be under $0.50, which is exceptional for iOS.</p>
-        <div class="impact">Expected: 10-20 additional daily installs at $5-10/day spend</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-medium">ENGAGEMENT</div>
-        <h4>Push Notification Strategy</h4>
-        <p>6.28 sessions/device is great, but you need to convert that engagement into retention data. Implement smart reminders: "Time to apply your patch", "You're on day X â keep going!" Habit-forming notifications are key for health apps.</p>
-        <div class="impact">Expected: 20-30% improvement in Day 7 retention</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-medium">EXPANSION</div>
-        <h4>Expand Beyond US Market</h4>
-        <p>US has 73 downloads (56%), but UK (12), Australia (8), Canada (7), and India (5) show demand. Localize your App Store listing for UK English, and consider targeting Australia/Canada with localized screenshots and descriptions.</p>
-        <div class="impact">Expected: 15-25% increase in total downloads</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-medium">SYNERGY</div>
-        <h4>Cross-Promote MealSight + PatchPal</h4>
-        <p>Once MealSight launches, create a health ecosystem. Users quitting smoking often focus on diet â offer a bundle discount or cross-app integration. "Track your patch AND your nutrition recovery."</p>
-        <div class="impact">Expected: 20-40% of PatchPal users trying MealSight</div>
-      </div>
-    </div>
-
-    <h2 style="font-size:18px;font-weight:700;color:#4ade80;margin-bottom:16px;">Long-Term Vision (1-3 Months)</h2>
-    <div class="strategy-grid">
-      <div class="strategy-card">
-        <div class="priority priority-low">VIRALITY</div>
-        <h4>Build Sharing Mechanics</h4>
-        <p>Add milestone celebrations: "7 days patch-free!", "1 month milestone!" with beautiful shareable cards for social media. Each share = free App Referrer traffic (your strongest channel at 76.9%).</p>
-        <div class="impact">Expected: Self-sustaining organic growth loop</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-low">COMMUNITY</div>
-        <h4>Health Community Partnerships</h4>
-        <p>Partner with smoking cessation communities, NRT subreddits, health coaches, and pharmacies. Offer bulk promo codes. Health apps grow through trust â community endorsements are powerful.</p>
-        <div class="impact">Expected: Credibility + steady referral stream</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-low">PLATFORM</div>
-        <h4>Widget + Apple Watch</h4>
-        <p>A home screen widget showing "Days since last patch change" or "Next patch reminder" keeps PatchPal visible. Apple Watch complications for quick logging would differentiate you from competitors.</p>
-        <div class="impact">Expected: Higher engagement + App Store featuring potential</div>
-      </div>
-      <div class="strategy-card">
-        <div class="priority priority-low">DATA</div>
-        <h4>Health Insights Dashboard</h4>
-        <p>Build in-app analytics: patch usage trends, adherence streaks, health correlation insights. This becomes your premium feature and moat â generic reminder apps can't compete with specialized health data.</p>
-        <div class="impact">Expected: Premium tier justification + lower churn</div>
-      </div>
-    </div>
-  </div>
+  <div class="tab-content" id="tab-strategy"></div>
 
 </div>
 
 <script>
+  const GIST_URL = 'https://gist.githubusercontent.com/sushantwason/9f570d36526b66954b0ab970353d3e58/raw/data.json';
+
   // Date
   document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -437,55 +212,232 @@
   Chart.defaults.borderColor = 'rgba(255,255,255,0.04)';
   Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, SF Pro Display, sans-serif';
 
-  // Daily Downloads & Page Views
-  const dates = ['Feb 3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','Mar 1','2','3','4'];
-  const downloads = [0,0,0,0,0,0,0,0,0,0,1,0,1,2,0,0,0,0,1,3,0,55,29,8,8,10,5,3,1,1];
-  const pageViews = [0,0,0,0,0,0,0,0,0,0,0,0,0,2,0,0,0,6,0,4,0,129,74,44,26,22,9,7,7,6];
-  const sessions = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,39,40,18,27,15,11,3,0,0];
+  function classForChange(change) {
+    if (!change || change === '0%') return 'neutral';
+    if (change.startsWith('+')) return 'positive';
+    if (change.startsWith('-')) {
+      // For crashes, decrease is positive
+      return 'positive';
+    }
+    return 'neutral';
+  }
 
-  new Chart(document.getElementById('dailyChart'), {
-    type: 'line',
-    data: {
-      labels: dates,
-      datasets: [
-        { label: 'Downloads', data: downloads, borderColor: '#7c8cf8', backgroundColor: 'rgba(124,140,248,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
-        { label: 'Page Views', data: pageViews, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.05)', fill: true, tension: 0.3, pointRadius: 2 },
-        { label: 'Sessions', data: sessions, borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.05)', fill: false, tension: 0.3, pointRadius: 2, borderDash: [5,3] }
-      ]
-    },
-    options: { responsive: true, plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.03)' } }, x: { grid: { display: false } } } }
-  });
+  function metricCard(label, value, change, sub, accent) {
+    const cls = classForChange(change);
+    return `<div class="metric-card" style="--accent:${accent}">
+      <div class="metric-label">${label}</div>
+      <div class="metric-value">${value}</div>
+      <div class="metric-change ${cls}">${change || ''}</div>
+      ${sub ? `<div class="metric-sub">${sub}</div>` : ''}
+    </div>`;
+  }
 
-  // Downloads by Source
-  new Chart(document.getElementById('sourceChart'), {
-    type: 'doughnut',
-    data: {
-      labels: ['App Referrer', 'App Store Search', 'Web Referrer', 'App Store Browse', 'Other'],
-      datasets: [{ data: [100, 20, 5, 4, 1], backgroundColor: ['#7c8cf8','#a78bfa','#4ade80','#38bdf8','#666680'], borderWidth: 0 }]
-    },
-    options: { responsive: true, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } } } }
-  });
+  function strategyCard(item) {
+    const pClass = ['HIGH IMPACT','REVENUE','STABILITY','BEFORE APPROVAL'].includes(item.priority) ? 'priority-high' :
+                   ['GROWTH','ENGAGEMENT','EXPANSION','SYNERGY','LAUNCH WEEK'].includes(item.priority) ? 'priority-medium' : 'priority-low';
+    return `<div class="strategy-card">
+      <div class="priority ${pClass}">${item.priority}</div>
+      <h4>${item.title}</h4>
+      <p>${item.description}</p>
+      ${item.impact ? `<div class="impact">${item.impact}</div>` : ''}
+    </div>`;
+  }
 
-  // Downloads by Territory
-  new Chart(document.getElementById('territoryChart'), {
-    type: 'bar',
-    data: {
-      labels: ['United States', 'United Kingdom', 'Australia', 'Canada', 'India'],
-      datasets: [{ label: 'Downloads', data: [73, 12, 8, 7, 5], backgroundColor: ['#7c8cf8','#a78bfa','#4ade80','#38bdf8','#facc15'], borderRadius: 8, barThickness: 32 }]
-    },
-    options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.03)' } }, y: { grid: { display: false } } } }
-  });
+  function renderDashboard(d) {
+    const pp = d.patchpal;
+    const ms = d.mealsight;
+    const st = d.strategy;
 
-  // Downloads by Device
-  new Chart(document.getElementById('deviceChart'), {
-    type: 'doughnut',
-    data: {
-      labels: ['iPhone', 'iPad'],
-      datasets: [{ data: [127, 3], backgroundColor: ['#7c8cf8','#a78bfa'], borderWidth: 0 }]
-    },
-    options: { responsive: true, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } } }
-  });
+    // Header
+    document.getElementById('dataPeriod').textContent = `Data period: ${d.dataPeriod} Â· Source: App Store Connect Â· Updated: ${new Date(d.lastUpdated).toLocaleString()}`;
+
+    // === PATCHPAL TAB ===
+
+    // 24h Snapshot
+    document.getElementById('snapshot24h').innerHTML =
+      `<div class="metric-card" style="--accent:#38bdf8;border:1px solid rgba(56,189,248,0.2)">
+        <div class="metric-label">Installs (Last 24h)</div>
+        <div class="metric-value">${pp.snapshot24h.installs}</div>
+        <div class="metric-change neutral">${pp.snapshot24h.date}</div>
+        <div class="metric-sub">7-day avg: ${pp.snapshot24h.installsAvg7d}/day</div>
+      </div>
+      <div class="metric-card" style="--accent:#a78bfa;border:1px solid rgba(167,139,250,0.2)">
+        <div class="metric-label">App Opens (Last 24h)</div>
+        <div class="metric-value">${pp.snapshot24h.sessions}</div>
+        <div class="metric-change neutral">${pp.snapshot24h.date} (${pp.snapshot24h.sessionsNote})</div>
+        <div class="metric-sub">7-day avg: ${pp.snapshot24h.sessionsAvg7d}/day</div>
+      </div>
+      <div class="metric-card" style="--accent:#4ade80;border:1px solid rgba(74,222,128,0.2)">
+        <div class="metric-label">Avg Opens / User</div>
+        <div class="metric-value">${pp.snapshot24h.avgOpensPerUser}</div>
+        <div class="metric-change positive">${pp.snapshot24h.avgOpensChange}</div>
+        <div class="metric-sub">${pp.snapshot24h.totalSessions} sessions &divide; ${pp.snapshot24h.activeDevices} active devices</div>
+      </div>
+      <div class="metric-card" style="--accent:#666680;border:1px solid rgba(102,102,128,0.2)">
+        <div class="metric-label">Avg Session Duration</div>
+        <div class="metric-value" style="font-size:22px;color:#666680">&mdash;</div>
+        <div class="metric-change neutral">Not available</div>
+        <div class="metric-sub">Requires Firebase / Mixpanel SDK</div>
+      </div>`;
+
+    // Key Insight
+    document.getElementById('keyInsightText').innerHTML = pp.keyInsight;
+
+    // Metrics Row 1
+    const m = pp.metrics;
+    document.getElementById('metricsRow1').innerHTML =
+      metricCard('Impressions', m.impressions.value, m.impressions.change, '', '#7c8cf8') +
+      metricCard('Product Page Views', m.pageViews.value, m.pageViews.change, '', '#a78bfa') +
+      metricCard('Conversion Rate', m.conversionRate.value, m.conversionRate.change, m.conversionRate.sub, '#4ade80') +
+      metricCard('Total Downloads', m.totalDownloads.value, m.totalDownloads.change, '', '#38bdf8');
+
+    // Metrics Row 2
+    document.getElementById('metricsRow2').innerHTML =
+      metricCard('Proceeds', m.proceeds.value, m.proceeds.change, '', '#f87171') +
+      metricCard('Sessions / Active Device', m.sessionsPerDevice.value, m.sessionsPerDevice.change, m.sessionsPerDevice.sub, '#facc15') +
+      metricCard('Crashes', m.crashes.value, m.crashes.change, '', '#f87171') +
+      metricCard('Retention', m.retention.value, m.retention.change, m.retention.sub, '#4ade80');
+
+    // Funnel
+    const f = pp.funnel;
+    const pvPct = (f.pageViews / f.impressions * 100).toFixed(1);
+    const dlPct = (f.downloads / f.pageViews * 100).toFixed(1);
+    document.getElementById('funnel').innerHTML =
+      `<div class="funnel-step">
+        <div class="funnel-label">Impressions</div>
+        <div class="funnel-bar" style="width:100%;background:linear-gradient(90deg,#7c8cf8,#6366f1)">${f.impressions}</div>
+      </div>
+      <div class="funnel-step">
+        <div class="funnel-label">Page Views</div>
+        <div class="funnel-bar" style="width:${pvPct}%;background:linear-gradient(90deg,#a78bfa,#8b5cf6)">${f.pageViews}</div>
+        <div class="funnel-value">${pvPct}% of impressions</div>
+      </div>
+      <div class="funnel-step">
+        <div class="funnel-label">Downloads</div>
+        <div class="funnel-bar" style="width:${(f.downloads / f.impressions * 100).toFixed(1)}%;background:linear-gradient(90deg,#4ade80,#22c55e)">${f.downloads}</div>
+        <div class="funnel-value">${dlPct}% of page views</div>
+      </div>`;
+
+    // Charts
+    const c = pp.charts;
+    new Chart(document.getElementById('dailyChart'), {
+      type: 'line',
+      data: {
+        labels: c.dates,
+        datasets: [
+          { label: 'Downloads', data: c.downloads, borderColor: '#7c8cf8', backgroundColor: 'rgba(124,140,248,0.1)', fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Page Views', data: c.pageViews, borderColor: '#a78bfa', backgroundColor: 'rgba(167,139,250,0.05)', fill: true, tension: 0.3, pointRadius: 2 },
+          { label: 'Sessions', data: c.sessions, borderColor: '#4ade80', backgroundColor: 'rgba(74,222,128,0.05)', fill: false, tension: 0.3, pointRadius: 2, borderDash: [5,3] }
+        ]
+      },
+      options: { responsive: true, plugins: { legend: { position: 'top', labels: { boxWidth: 12, padding: 16 } } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.03)' } }, x: { grid: { display: false } } } }
+    });
+
+    const srcColors = ['#7c8cf8','#a78bfa','#4ade80','#38bdf8','#666680'];
+    new Chart(document.getElementById('sourceChart'), {
+      type: 'doughnut',
+      data: { labels: pp.downloadsBySource.labels, datasets: [{ data: pp.downloadsBySource.data, backgroundColor: srcColors, borderWidth: 0 }] },
+      options: { responsive: true, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } } } }
+    });
+
+    const terrColors = ['#7c8cf8','#a78bfa','#4ade80','#38bdf8','#facc15'];
+    new Chart(document.getElementById('territoryChart'), {
+      type: 'bar',
+      data: { labels: pp.downloadsByTerritory.labels, datasets: [{ label: 'Downloads', data: pp.downloadsByTerritory.data, backgroundColor: terrColors, borderRadius: 8, barThickness: 32 }] },
+      options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.03)' } }, y: { grid: { display: false } } } }
+    });
+
+    new Chart(document.getElementById('deviceChart'), {
+      type: 'doughnut',
+      data: { labels: pp.downloadsByDevice.labels, datasets: [{ data: pp.downloadsByDevice.data, backgroundColor: ['#7c8cf8','#a78bfa'], borderWidth: 0 }] },
+      options: { responsive: true, cutout: '65%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12 } } } }
+    });
+
+    // App Status
+    const s = pp.appStatus;
+    const badgeClass = s.nextVersionStatus === 'Prepare for Submission' ? 'badge-prep' : s.nextVersionStatus === 'Waiting for Review' ? 'badge-review' : 'badge-live';
+    document.getElementById('statusRow').innerHTML =
+      `<div class="status-card">
+        <h3 style="color:#4ade80">PatchPal Status</h3>
+        <table class="data-table">
+          <tr><td>Current Live Version</td><td style="color:#e0e0f0;font-weight:600">${s.liveVersion}</td></tr>
+          <tr><td>Next Version</td><td style="color:#e0e0f0;font-weight:600">${s.nextVersion} <span class="status-badge ${badgeClass}">${s.nextVersionStatus}</span></td></tr>
+          <tr><td>Platform</td><td>${s.platform}</td></tr>
+          <tr><td>Primary Device</td><td>${s.primaryDevice}</td></tr>
+        </table>
+      </div>
+      <div class="status-card">
+        <h3 style="color:#facc15">Daily Checklist</h3>
+        <table class="data-table">
+          <tr><td>1.</td><td>Check yesterday's downloads vs. 7-day average</td></tr>
+          <tr><td>2.</td><td>Monitor crash count (target: 0)</td></tr>
+          <tr><td>3.</td><td>Review App Store Search rankings</td></tr>
+          <tr><td>4.</td><td>Check conversion rate trend</td></tr>
+          <tr><td>5.</td><td>Respond to any new reviews</td></tr>
+          <tr><td>6.</td><td>Check MealSight review status</td></tr>
+        </table>
+      </div>`;
+
+    // === MEALSIGHT TAB ===
+    if (ms.isLive) {
+      document.getElementById('tab-mealsight').innerHTML = '<div class="insight-callout"><h3>MealSight is Live!</h3><p>Analytics data will appear here once sufficient data is collected.</p></div>';
+    } else {
+      const msBadge = ms.status === 'Waiting for Review' ? 'badge-review' : ms.status === 'Ready for Sale' ? 'badge-live' : 'badge-prep';
+      document.getElementById('tab-mealsight').innerHTML =
+        `<div class="pending-panel">
+          <div class="pending-icon">&#9203;</div>
+          <h3>${ms.appName}</h3>
+          <p style="font-size:16px;margin-bottom:16px;">${ms.version} â ${ms.status}</p>
+          <p>Submitted ${ms.submittedDate}. Apple typically reviews within 24-48 hours.</p>
+          <div style="margin-top:24px;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;">
+            <table class="data-table">
+              <tr><td>App Name</td><td style="color:#e0e0f0;font-weight:600">${ms.appName}</td></tr>
+              <tr><td>Version</td><td>${ms.version}</td></tr>
+              <tr><td>Status</td><td><span class="status-badge ${msBadge}">${ms.status}</span></td></tr>
+              <tr><td>Submitted</td><td>${ms.submittedDate}</td></tr>
+              <tr><td>Draft Submissions</td><td>${ms.draftSubmissions}</td></tr>
+              <tr><td>Previous Attempts</td><td>${ms.previousAttempts}</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="strategy-section" style="margin-top:32px">
+          <h2>Pre-Launch Checklist for MealSight</h2>
+          <div class="strategy-grid">${(st.mealsightPreLaunch || []).map(strategyCard).join('')}</div>
+        </div>`;
+    }
+
+    // === STRATEGY TAB ===
+    document.getElementById('tab-strategy').innerHTML =
+      `<div class="insight-callout">
+        <h3>Strategic Overview</h3>
+        <p>${st.overview}</p>
+      </div>
+      <h2 style="font-size:18px;font-weight:700;color:#f87171;margin-bottom:16px;">Immediate Actions (This Week)</h2>
+      <div class="strategy-grid" style="margin-bottom:32px">${st.immediate.map(strategyCard).join('')}</div>
+      <h2 style="font-size:18px;font-weight:700;color:#facc15;margin-bottom:16px;">Medium-Term Plays (Next 2-4 Weeks)</h2>
+      <div class="strategy-grid" style="margin-bottom:32px">${st.mediumTerm.map(strategyCard).join('')}</div>
+      <h2 style="font-size:18px;font-weight:700;color:#4ade80;margin-bottom:16px;">Long-Term Vision (1-3 Months)</h2>
+      <div class="strategy-grid">${st.longTerm.map(strategyCard).join('')}</div>`;
+  }
+
+  // Fetch and render
+  fetch(GIST_URL + '?_=' + Date.now())
+    .then(r => {
+      if (!r.ok) throw new Error('Failed to fetch data: ' + r.status);
+      return r.json();
+    })
+    .then(data => {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('tab-patchpal').style.display = 'block';
+      renderDashboard(data);
+    })
+    .catch(err => {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error').textContent = 'Error loading dashboard data: ' + err.message + '. Please try refreshing.';
+    });
 </script>
 
 </body>
 </html>
+
