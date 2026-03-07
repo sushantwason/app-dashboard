@@ -40,9 +40,9 @@ jobs:
           server_address: smtp.gmail.com
           server_port: 465
           secure: true
-          username: sushwason@gmail.com
+          username: patchpalfeedback@gmail.com
           password: ${{ secrets.GMAIL_APP_PASSWORD }}
           subject: "Dashboard - ${{ steps.date.outputs.date }}"
           to: sushwason@gmail.com
-          from: "Dashboard Bot <sushwason@gmail.com>"
+          from: "Dashboard Bot <patchpalfeedback@gmail.com>"
           html_body: file://dashboard_email.html
