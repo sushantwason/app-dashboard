@@ -298,6 +298,8 @@ def build_data_json(token):
             data["mealsight"]["status"] = ms_status
         if ms_version != "Unknown":
             data["mealsight"]["version"] = f"iOS {ms_version}"
+        # Always refresh snapshot24h date to yesterday (App Store Connect has ~2-3 day lag)
+        data["patchpal"]["snapshot24h"]["date"] = (today - timedelta(days=1)).strftime("%b %-d")
         # Update Android: always refresh statusLabel; only override status if API source
         if "android_patchpal" not in data:
             data["android_patchpal"] = android_data
