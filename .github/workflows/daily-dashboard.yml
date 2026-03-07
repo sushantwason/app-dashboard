@@ -1,0 +1,31 @@
+name: Daily Dashboard Update
+
+on:
+  schedule:
+    # 9am Pacific Time (5pm UTC during PST, 4pm UTC during PDT)
+    - cron: '0 17 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  update-dashboard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install PyJWT cryptography
+
+      - name: Run dashboard updater
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+          GIST_PAT: ${{ secrets.GIST_PAT }}
+        run: python scripts/update_dashboard.py
