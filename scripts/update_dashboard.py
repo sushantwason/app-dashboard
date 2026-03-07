@@ -265,7 +265,7 @@ def build_data_json(token):
                     "impressions": {"value": 0, "change": "0%"},
                     "pageViews": {"value": 0, "change": "0%"},
                     "conversionRate": {"value": "0%", "change": "0%", "sub": "Daily Average"},
-                    "totalDownloads': {"value": 0, "change": "0%"},
+                    "totalDownloads": {"value": 0, "change": "0%"},
                     "proceeds": {"value": "$0", "change": "0%"},
                     "sessionsPerDevice": {"value": 0, "change": "0%", "sub": "Opt-in Only"},
                     "crashes": {"value": 0, "change": "0%"},
