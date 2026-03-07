@@ -2,9 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; connect-src https://gist.githubusercontent.com; img-src 'self' data:;">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sushant's Daily Dashboard</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha384-e4SEs0MRUL5VgBTK1GweDmF3ylJF5VWGxGiRLg0/xOhO2vlahsBJasPwtwz0RI1o" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js" integrity="sha384-X9xCbGeAkBMYhKS6boFfPNmxGbSBDIBBCMV0HMj9+XXMtg3BEJz89RlnGX6Xjdg" crossorigin="anonymous"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; background: #0a0a1a; color: #e0e0f0; min-height: 100vh; }
@@ -194,7 +196,7 @@
 </div>
 
 <script>
-  const GIST_URL = 'https://gist.githubusercontent.com/sushantwason/a2883b884c26b0f4d910ff5a7acbf777/raw/data.json';
+  const GIST_URL = 'https://gist.githubusercontent.com/sushantwason/a4c54ade850bc740fdfe8bb583a85648/raw/data.json';
 
   // Date
   document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
@@ -211,6 +213,9 @@
   Chart.defaults.color = '#8888aa';
   Chart.defaults.borderColor = 'rgba(255,255,255,0.04)';
   Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, SF Pro Display, sans-serif';
+
+        // Security: sanitize HTML to prevent XSS
+        function safeHTML(el, html) { el.innerHTML = DOMPurify.sanitize(html); }
 
   function classForChange(change) {
     if (!change || change === '0%') return 'neutral';
@@ -249,12 +254,12 @@
     const st = d.strategy;
 
     // Header
-    document.getElementById('dataPeriod').textContent = `Data period: ${d.dataPeriod} Â· Source: App Store Connect Â· Updated: ${new Date(d.lastUpdated).toLocaleString()}`;
+    document.getElementById('dataPeriod').textContent = `Data period: ${d.dataPeriod} ÃÂ· Source: App Store Connect ÃÂ· Updated: ${new Date(d.lastUpdated).toLocaleString()}`;
 
     // === PATCHPAL TAB ===
 
     // 24h Snapshot
-    document.getElementById('snapshot24h').innerHTML =
+    safeHTML(document.getElementById('snapshot24h'),
       `<div class="metric-card" style="--accent:#38bdf8;border:1px solid rgba(56,189,248,0.2)">
         <div class="metric-label">Installs (Last 24h)</div>
         <div class="metric-value">${pp.snapshot24h.installs}</div>
@@ -281,18 +286,18 @@
       </div>`;
 
     // Key Insight
-    document.getElementById('keyInsightText').innerHTML = pp.keyInsight;
+    document.getElementById('keyInsightText').textContent = pp.keyInsight;
 
     // Metrics Row 1
     const m = pp.metrics;
-    document.getElementById('metricsRow1').innerHTML =
+    safeHTML(document.getElementById('metricsRow1'),
       metricCard('Impressions', m.impressions.value, m.impressions.change, '', '#7c8cf8') +
       metricCard('Product Page Views', m.pageViews.value, m.pageViews.change, '', '#a78bfa') +
       metricCard('Conversion Rate', m.conversionRate.value, m.conversionRate.change, m.conversionRate.sub, '#4ade80') +
       metricCard('Total Downloads', m.totalDownloads.value, m.totalDownloads.change, '', '#38bdf8');
 
     // Metrics Row 2
-    document.getElementById('metricsRow2').innerHTML =
+    safeHTML(document.getElementById('metricsRow2'),
       metricCard('Proceeds', m.proceeds.value, m.proceeds.change, '', '#f87171') +
       metricCard('Sessions / Active Device', m.sessionsPerDevice.value, m.sessionsPerDevice.change, m.sessionsPerDevice.sub, '#facc15') +
       metricCard('Crashes', m.crashes.value, m.crashes.change, '', '#f87171') +
@@ -302,7 +307,7 @@
     const f = pp.funnel;
     const pvPct = (f.pageViews / f.impressions * 100).toFixed(1);
     const dlPct = (f.downloads / f.pageViews * 100).toFixed(1);
-    document.getElementById('funnel').innerHTML =
+    safeHTML(document.getElementById('funnel'),
       `<div class="funnel-step">
         <div class="funnel-label">Impressions</div>
         <div class="funnel-bar" style="width:100%;background:linear-gradient(90deg,#7c8cf8,#6366f1)">${f.impressions}</div>
@@ -356,7 +361,7 @@
     // App Status
     const s = pp.appStatus;
     const badgeClass = s.nextVersionStatus === 'Prepare for Submission' ? 'badge-prep' : s.nextVersionStatus === 'Waiting for Review' ? 'badge-review' : 'badge-live';
-    document.getElementById('statusRow').innerHTML =
+    safeHTML(document.getElementById('statusRow'),
       `<div class="status-card">
         <h3 style="color:#4ade80">PatchPal Status</h3>
         <table class="data-table">
@@ -380,14 +385,14 @@
 
     // === MEALSIGHT TAB ===
     if (ms.isLive) {
-      document.getElementById('tab-mealsight').innerHTML = '<div class="insight-callout"><h3>MealSight is Live!</h3><p>Analytics data will appear here once sufficient data is collected.</p></div>';
+      safeHTML(document.getElementById('tab-mealsight'), '<div class="insight-callout"><h3>MealSight is Live!</h3><p>Analytics data will appear here once sufficient data is collected.</p></div>';
     } else {
       const msBadge = ms.status === 'Waiting for Review' ? 'badge-review' : ms.status === 'Ready for Sale' ? 'badge-live' : 'badge-prep';
-      document.getElementById('tab-mealsight').innerHTML =
+      safeHTML(document.getElementById('tab-mealsight'),
         `<div class="pending-panel">
           <div class="pending-icon">&#9203;</div>
           <h3>${ms.appName}</h3>
-          <p style="font-size:16px;margin-bottom:16px;">${ms.version} â ${ms.status}</p>
+          <p style="font-size:16px;margin-bottom:16px;">${ms.version} Ã¢ÂÂ ${ms.status}</p>
           <p>Submitted ${ms.submittedDate}. Apple typically reviews within 24-48 hours.</p>
           <div style="margin-top:24px;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;">
             <table class="data-table">
@@ -407,7 +412,7 @@
     }
 
     // === STRATEGY TAB ===
-    document.getElementById('tab-strategy').innerHTML =
+    safeHTML(document.getElementById('tab-strategy'),
       `<div class="insight-callout">
         <h3>Strategic Overview</h3>
         <p>${st.overview}</p>
