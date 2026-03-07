@@ -385,7 +385,7 @@
 
     // === MEALSIGHT TAB ===
     if (ms.isLive) {
-      safeHTML(document.getElementById('tab-mealsight'), '<div class="insight-callout"><h3>MealSight is Live!</h3><p>Analytics data will appear here once sufficient data is collected.</p></div>';
+      safeHTML(document.getElementById('tab-mealsight'), '<div class="insight-callout"><h3>MealSight is Live!</h3><p>Analytics data will appear here once sufficient data is collected.</p></div>');
     } else {
       const msBadge = ms.status === 'Waiting for Review' ? 'badge-review' : ms.status === 'Ready for Sale' ? 'badge-live' : 'badge-prep';
       safeHTML(document.getElementById('tab-mealsight'),
