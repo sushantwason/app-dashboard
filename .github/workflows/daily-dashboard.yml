@@ -29,3 +29,20 @@ jobs:
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           GIST_PAT: ${{ secrets.GIST_PAT }}
         run: python scripts/update_dashboard.py
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%B %-d, %Y')" >> $GITHUB_OUTPUT
+
+      - name: Send dashboard email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: sushwason@gmail.com
+          password: ${{ secrets.GMAIL_APP_PASSWORD }}
+          subject: "Dashboard â ${{ steps.date.outputs.date }}"
+          to: sushwason@gmail.com
+          from: "Dashboard Bot <sushwason@gmail.com>"
+          html_body: file://dashboard_email.html
