@@ -497,7 +497,7 @@ def generate_email_html(data):
       <tr>
         <td style="padding:6px 0;">
           <span style="color:#8888aa;font-size:11px;">Impressions</span><br>
-          <div style="background:rgba(124,140,248,0.3);border-radius:6px;height:24px;width:{a[pct}%;margin-top:4px;">
+          <div style="background:rgba(124,140,248,0.3);border-radius:6px;height:24px;width:{imp_pct}%;margin-top:4px;">
             <div style="background:#7c8cf8;border-radius:6px;height:24px;width:100%;text-align:center;line-height:24px;font-size:11px;color:#fff;font-weight:600;">{funnel_imp:,}</div>
           </div>
         </td>
@@ -513,7 +513,7 @@ def generate_email_html(data):
       <tr>
         <td style="padding:6px 0;">
           <span style="color:#8888aa;font-size:11px;">Downloads</span><br>
-          <div style="background:rgba(74,222,128,0.2);border-radius:6px;height:24px;width:{dl_pct:4px;">
+          <div style="background:rgba(74,222,128,0.2);border-radius:6px;height:24px;width:{dl_pct}%;margin-top:4px;">
             <div style="background:#4ade80;border-radius:6px;height:24px;width:100%;text-align:center;line-height:24px;font-size:11px;color:#0a0a1a;font-weight:600;">{funnel_dl:,}</div>
           </div>
         </td>
