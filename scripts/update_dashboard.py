@@ -215,7 +215,7 @@ def build_data_json(token):
         req = urllib.request.Request(gist_raw_url + f"?_={int(time.time())}")
         with urllib.request.urlopen(req) as resp:
             prev_data = json.loads(resp.read().decode())
-        print("Loaded previous gist data as fallback")
+        prin  print("Loaded previous gist data as fallback")
     except Exception as e:
         print(f"Could not fetch previous data: {e}", file=sys.stderr)
 
@@ -226,7 +226,7 @@ def build_data_json(token):
 
         # Update date period
         start_dt = today - timedelta(days=30)
-        data["dataPeriod"] = f"{start_dt.strftime('%b %-d')} â {(today - timedelta(days=1)).strftime('%b %-d, %Y')}"
+        data["dataPeriod"] = f"{start_dt.strftime('%b %-d')} – {(today - timedelta(days=1)).strftime('%b %-d, %Y')}"
 
         # Update app status
         if pp_live_version != "Unknown":
@@ -246,7 +246,7 @@ def build_data_json(token):
         # Build from scratch with what we have
         data = {
             "lastUpdated": today.isoformat(),
-            "dataPeriod": f"{(today - timedelta(days=30)).strftime('%b %-d')} â {(today - timedelta(days=1)).strftime('%b %-d, %Y')}",
+            "dataPeriod": f"{(today - timedelta(days=30)).strftime('%b %-d')} – {(today - timedelta(days=1)).strftime('%b %-d, %Y')}",
             "patchpal": {
                 "snapshot24h": {
                     "date": (today - timedelta(days=1)).strftime("%b %-d"),
@@ -265,11 +265,11 @@ def build_data_json(token):
                     "impressions": {"value": 0, "change": "0%"},
                     "pageViews": {"value": 0, "change": "0%"},
                     "conversionRate": {"value": "0%", "change": "0%", "sub": "Daily Average"},
-                    "totalDownloads": {"value": 0, "change": "0%"},
+                    "totalDownloads': {"value": 0, "change": "0%"},
                     "proceeds": {"value": "$0", "change": "0%"},
                     "sessionsPerDevice": {"value": 0, "change": "0%", "sub": "Opt-in Only"},
                     "crashes": {"value": 0, "change": "0%"},
-                    "retention": {"value": "â", "change": "Not enough data", "sub": "Need more opt-in users"},
+                    "retention": {"value": "—", "change": "Not enough data", "sub": "Need more opt-in users"},
                 },
                 "funnel": {"impressions": 0, "pageViews": 0, "downloads": 0},
                 "charts": {"dates": dates, "downloads": [0]*30, "pageViews": [0]*30, "sessions": [0]*30},
@@ -331,6 +331,258 @@ def update_gist(data_json):
         return False
 
 
+def generate_email_html(data):
+    """Generate a self-contained HTML email version of the dashboard."""
+    today = datetime.now(timezone.utc)
+    day_name = today.strftime("%A")
+    date_str = today.strftime("%B %-d, %Y")
+    updated = data.get("lastUpdated", today.isoformat())
+
+    pp = data.get("patchpal", {})
+    snap = pp.get("snapshot24h", {})
+    metrics = pp.get("metrics", {})
+    app_status = pp.get("appStatus", {})
+    ms = data.get("mealsight", {})
+    strategy = data.get("strategy", {})
+
+    def metric_color(change_str):
+        if not change_str or change_str == "0%":
+            return "#8888aa"
+        if change_str.startswith("+"):
+            return "#4ade80"
+        if change_str.startswith("-"):
+            return "#f87171"
+        return "#8888aa"
+
+    def fmt_val(v):
+        if isinstance(v, (int, float)):
+            return f"{v:,.0f}" if v == int(v) else f"{v:,.2f}"
+        return str(v)
+
+    # Build metric rows for the KPI table
+    kpi_items = [
+        ("Impressions", metrics.get("impressions", {})),
+        ("Page Views", metrics.get("pageViews", {})),
+        ("Conversion Rate", metrics.get("conversionRate", {})),
+        ("Total Downloads", metrics.get("totalDownloads", {})),
+        ("Proceeds", metrics.get("proceeds", {})),
+        ("Sessions / Device", metrics.get("sessionsPerDevice", {})),
+        ("Crashes", metrics.get("crashes", {})),
+        ("Retention", metrics.get("retention", {})),
+    ]
+
+    kpi_rows = ""
+    for i in range(0, len(kpi_items), 2):
+        left_name, left_data = kpi_items[i]
+        left_val = fmt_val(left_data.get("value", "—"))
+        left_chg = left_data.get("change", "")
+        left_color = metric_color(left_chg)
+
+        right_name, right_data = kpi_items[i + 1] if i + 1 < len(kpi_items) else ("", {})
+        right_val = fmt_val(right_data.get("value", "—"))
+        right_chg = right_data.get("change", "")
+        right_color = metric_color(right_chg)
+
+        kpi_rows += f"""
+        <tr>
+          <td style="padding:12px 16px;border-bottom:1px solid #1a1a3e;">
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">{left_name}</span><br>
+            <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{left_val}</span>
+            <span style="font-size:12px;color:{left_color};margin-left:8px;">{left_chg}</span>
+          </td>
+          <td style="padding:12px 16px;border-bottom:1px solid #1a1a3e;">
+            <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">{right_name}</span><br>
+            <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{right_val}</span>
+            <span style="font-size:12px;color:{right_color};margin-left:8px;">{right_chg}</span>
+          </td>
+        </tr>"""
+
+    # Strategy items (immediate priorities)
+    priority_rows = ""
+    for item in strategy.get("immediate", [])[:4]:
+        priority_rows += f"""
+        <tr>
+          <td style="padding:10px 16px;border-bottom:1px solid #1a1a3e;">
+            <span style="display:inline-block;background:#f87171;color:#0a0a1a;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-right:8px;">HIGH</span>
+            <span style="color:#f0f0ff;font-weight:600;font-size:14px;">{item.get('title', '')}</span>
+            <br><span style="color:#8888aa;font-size:12px;margin-top:4px;display:inline-block;">{item.get('description', '')[:120]}</span>
+          </td>
+        </tr>"""
+
+    # Funnel data
+    funnel = pp.get("funnel", {})
+    funnel_imp = funnel.get("impressions", 0)
+    funnel_pv = funnel.get("pageViews", 0)
+    funnel_dl = funnel.get("downloads", 0)
+
+    # Bar widths for funnel (relative to impressions)
+    max_funnel = max(funnel_imp, 1)
+    imp_pct = 100
+    pv_pct = max(int(funnel_pv / max_funnel * 100), 5) if funnel_pv else 5
+    dl_pct = max(int(funnel_dl / max_funnel * 100), 5) if funnel_dl else 5
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Dashboard - {date_str}</title>
+</head>
+<body style="margin:0;padding:0;background:#0a0a1a;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a1a;">
+<tr><td align="center" style="padding:20px 10px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
+
+  <!-- HEADER -->
+  <tr><td style="background:linear-gradient(135deg,#1a1a3e,#0d0d2b);padding:28px 30px;border-radius:16px 16px 0 0;border-bottom:1px solid rgba(255,255,255,0.06);">
+    <h1 style="margin:0;font-size:22px;font-weight:700;color:#7c8cf8;">Sushant's Daily Dashboard</h1>
+    <p style="margin:4px 0 0;color:#8888aa;font-size:13px;">{day_name}, {date_str}</p>
+    <p style="margin:2px 0 0;color:#666680;font-size:11px;">Source: App Store Connect &middot; Updated: {updated[:16].replace('T', ' ')} UTC</p>
+  </td></tr>
+
+  <!-- 24H SNAPSHOT -->
+  <tr><td style="background:#0d0d20;padding:24px 30px;">
+    <p style="font-size:13px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 16px;">PatchPal &mdash; Last 24h ({snap.get('date', '')})</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td width="25%" style="text-align:center;padding:12px 4px;background:rgba(255,255,255,0.03);border-radius:12px;">
+          <span style="font-size:28px;font-weight:700;color:#f0f0ff;">{snap.get('installs', 0)}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Installs</span><br>
+          <span style="font-size:10px;color:#666680;">7d avg: {snap.get('installsAvg7d', 0)}/day</span>
+        </td>
+        <td width="4"></td>
+        <td width="25%" style="text-align:center;padding:12px 4px;background:rgba(255,255,255,0.03);border-radius:12px;">
+          <span style="font-size:28px;font-weight:700;color:#f0f0ff;">{snap.get('sessions', 0)}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Sessions</span><br>
+          <span style="font-size:10px;color:#666680;">7d avg: {snap.get('sessionsAvg7d', 0)}/day</span>
+        </td>
+        <td width="4"></td>
+        <td width="25%" style="text-align:center;padding:12px 4px;background:rgba(255,255,255,0.03);border-radius:12px;">
+          <span style="font-size:28px;font-weight:700;color:#f0f0ff;">{snap.get('avgOpensPerUser', 0)}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Avg Opens/User</span><br>
+          <span style="font-size:10px;color:{intric_color(snap.get('avgOpensChange', ''))};">{snap.get('avgOpensChange', '')}</span>
+        </td>
+        <td width="4"></td>
+        <td width="25%" style="text-align:center;padding:12px 4px;background:rgba(255,255,255,0.03);border-radius:12px;">
+          <span style="font-size:28px;font-weight:700;color:#f0f0ff;">{snap.get('activeDevices', 0)}</span><br>
+          <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Active Devices</span><br>
+          <span style="font-size:10px;color:#666680;">{snap.get('totalSessions', 0)} total sessions</span>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- KEY INSIGHT -->
+  <tr><td style="background:#0d0d20;padding:0 30px 20px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr><td style="background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.15);border-radius:12px;padding:16px 20px;">
+        <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#f87171;">Key Insight</p>
+        <p style="margin:0;font-size:13px;color:#c0c0dd;line-height:1.5;">{pp.get('keyInsight', 'No insight available.')[:300]}</p>
+      </td></tr>
+    </table>
+  </td></tr>
+
+  <!-- KPI GRID -->
+  <tr><td style="background:#0d0d20;padding:0 30px 24px;">
+    <p style="font-size:13px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px;">Key Metrics (30-day)</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.02);border-radius:12px;overflow:hidden;">
+      {kpi_rows}
+    </table>
+  </td></tr>
+
+  <!-- CONVERSION FUNNEL -->
+  <tr><td style="background:#0d0d20;padding:0 30px 24px;">
+    <p style="font-size:13px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px;">Conversion Funnel</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="padding:6px 0;">
+          <span style="color:#8888aa;font-size:11px;">Impressions</span><br>
+          <div style="background:rgba(124,140,248,0.3);border-radius:6px;height:24px;width:{a[pct}%;margin-top:4px;">
+            <div style="background:#7c8cf8;border-radius:6px;height:24px;width:100%;text-align:center;line-height:24px;font-size:11px;color:#fff;font-weight:600;">{funnel_imp:,}</div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;">
+          <span style="color:#8888aa;font-size:11px;">Page Views</span><br>
+          <div style="background:rgba(167,139,250,0.2);border-radius:6px;height:24px;width:{pv_pct}%;margin-top:4px;">
+            <div style="background:#a78bfa;border-radius:6px;height:24px;width:100%;text-align:center;line-height:24px;font-size:11px;color:#fff;font-weight:600;">{funnel_pv:,}</div>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;">
+          <span style="color:#8888aa;font-size:11px;">Downloads</span><br>
+          <div style="background:rgba(74,222,128,0.2);border-radius:6px;height:24px;width:{dl_pct:4px;">
+            <div style="background:#4ade80;border-radius:6px;height:24px;width:100%;text-align:center;line-height:24px;font-size:11px;color:#0a0a1a;font-weight:600;">{funnel_dl:,}</div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- APP STATUS -->
+  <tr><td style="background:#0d0d20;padding:0 30px 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.02);border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:14px 16px;border-bottom:1px solid #1a1a3e;">
+          <span style="color:#8888aa;font-size:11px;">PATCHPAL STATUS</span><br>
+          <span style="color:#f0f0ff;font-weight:600;">v{app_status.get('liveVersion', '?')}</span>
+          <span style="display:inline-block;background:#4ade80;color:#0a0a1a;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:700;margin-left:8px;">LIVE</span>
+        </td>
+        <td style="padding:14px 16px;border-bottom:1px solid #1a1a3e;">
+          <span style="color:#8888aa;font-size:11px;">NEXT VERSION</span><br>
+          <span style="color:#f0f0ff;font-weight:600;">v{app_status.get('nextVersion', '—')}</span>
+          <span style="color:#facc15;font-size:11px;margin-left:8px;">{app_status.get('nextVersionStatus', '')}</span>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- MEALSIGHT -->
+  <tr><td style="background:#0d0d20;padding:0 30px 24px;">
+    <p style="font-size:13px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px;">MealSight</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.02);border-radius:12px;overflow:hidden;">
+      <tr>
+        <td style="padding:14px 16px;">
+          <span style="color:#8888aa;font-size:11px;">APP</span><br>
+          <span style="color:#f0f0ff;font-weight:600;">{ms.get('appName', 'MealSight')}</span>
+        </td>
+        <td style="padding:14px 16px;">
+          <span style="color:#8888aa;font-size:11px;">VERSION</span><br>
+          <span style="color:#f0f0ff;font-weight:600;">{ms.get('version', '—')}</span>
+        </td>
+        <td style="padding:14px 16px;">
+          <span style="color:#8888aa;font-size:11px;">STATUS</span><br>
+          <span style="color:#facc15;font-weight:600;">{ms.get('status', '—')}</span>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- TOP PRIORITIES -->
+  {"" if not strategy.get("immediate") else f'''<tr><td style="background:#0d0d20;padding:0 30px 24px;">
+    <p style="font-size:13px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px;">Top Priorities</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.02);border-radius:12px;overflow:hidden;">
+      {priority_rows}
+    </table>
+  </td></tr>'''}
+
+  <!-- FOOTER -->
+  <tr><td style="background:#0d0d20;padding:20px 30px 28px;border-radius:0 0 16px 16px;text-align:center;">
+    <a href="https://sushantwason.github.io/app-dashboard/" style="display:inline-block;background:rgba(124,140,248,0.15);color:#7c8cf8;padding:10px 24px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;">View Full Dashboard &rarr;</a>
+    <p style="margin:16px 0 0;color:#666680;font-size:11px;">Sent automatically by GitHub Actions</p>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>"""
+
+    return html
+
+
 def main():
     print("=== Daily App Dashboard Updater ===")
     print(f"Time: {datetime.now(timezone.utc).isoformat()}")
@@ -351,6 +603,13 @@ def main():
     else:
         print("Failed to update dashboard", file=sys.stderr)
         sys.exit(1)
+
+    # Generate email HTML
+    email_html = generate_email_html(data)
+    email_path = "dashboard_email.html"
+    with open(email_path, "w") as f:
+        f.write(email_html)
+    print(f"Email HTML written to {email_path}")
 
 
 if __name__ == "__main__":
