@@ -42,7 +42,7 @@ jobs:
           secure: true
           username: sushwason@gmail.com
           password: ${{ secrets.GMAIL_APP_PASSWORD }}
-          subject: "Dashboard â ${{ steps.date.outputs.date }}"
+          subject: "Dashboard - ${{ steps.date.outputs.date }}"
           to: sushwason@gmail.com
           from: "Dashboard Bot <sushwason@gmail.com>"
           html_body: file://dashboard_email.html
