@@ -186,7 +186,7 @@ def build_data_json(token):
     pp_next_status = "Unknown"
     for v in pp_versions:
         attrs = v.get("attributes", {})
-        state = attrs.get("appStoreState", "")
+        state = attrs.get("appVersionState", "") or attrs.get("appStoreState", "")
         version = attrs.get("versionString", "")
         if state == "READY_FOR_SALE":
             pp_live_version = version
@@ -206,7 +206,7 @@ def build_data_json(token):
     ms_app_name = "MealSight - AI Food Scanner"
     for v in ms_versions:
         attrs = v.get("attributes", {})
-        state = attrs.get("appStoreState", "")
+        state = attrs.get("appVersionState", "") or attrs.get("appStoreState", "")
         version = attrs.get("versionString", "")
         if state == "READY_FOR_SALE":
             ms_is_live = True
