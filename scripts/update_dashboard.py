@@ -460,7 +460,7 @@ def generate_email_html(data):
         <td width="25%" style="text-align:center;padding:12px 4px;background:rgba(255,255,255,0.03);border-radius:12px;">
           <span style="font-size:28px;font-weight:700;color:#f0f0ff;">{snap.get('avgOpensPerUser', 0)}</span><br>
           <span style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Avg Opens/User</span><br>
-          <span style="font-size:10px;color:{intric_color(snap.get('avgOpensChange', ''))};">{snap.get('avgOpensChange', '')}</span>
+          <span style="font-size:10px;color:{metric_color(snap.get('avgOpensChange', ''))};">{snap.get('avgOpensChange', '')}</span>
         </td>
         <td width="4"></td>
         <td width="25%" style="text-align:center;padding:12px 4px;background:rgba(255,255,255,0.03);border-radius:12px;">
