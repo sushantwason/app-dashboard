@@ -283,7 +283,7 @@
         <div class="metric-value" style="font-size:22px;color:#666680">&mdash;</div>
         <div class="metric-change neutral">Not available</div>
         <div class="metric-sub">Requires Firebase / Mixpanel SDK</div>
-      </div>`;
+      </div>`);
 
     // Key Insight
     document.getElementById('keyInsightText').textContent = pp.keyInsight;
@@ -294,14 +294,14 @@
       metricCard('Impressions', m.impressions.value, m.impressions.change, '', '#7c8cf8') +
       metricCard('Product Page Views', m.pageViews.value, m.pageViews.change, '', '#a78bfa') +
       metricCard('Conversion Rate', m.conversionRate.value, m.conversionRate.change, m.conversionRate.sub, '#4ade80') +
-      metricCard('Total Downloads', m.totalDownloads.value, m.totalDownloads.change, '', '#38bdf8');
+      metricCard('Total Downloads', m.totalDownloads.value, m.totalDownloads.change, '', '#38bdf8'));
 
     // Metrics Row 2
     safeHTML(document.getElementById('metricsRow2'),
       metricCard('Proceeds', m.proceeds.value, m.proceeds.change, '', '#f87171') +
       metricCard('Sessions / Active Device', m.sessionsPerDevice.value, m.sessionsPerDevice.change, m.sessionsPerDevice.sub, '#facc15') +
       metricCard('Crashes', m.crashes.value, m.crashes.change, '', '#f87171') +
-      metricCard('Retention', m.retention.value, m.retention.change, m.retention.sub, '#4ade80');
+      metricCard('Retention', m.retention.value, m.retention.change, m.retention.sub, '#4ade80'));
 
     // Funnel
     const f = pp.funnel;
@@ -321,7 +321,7 @@
         <div class="funnel-label">Downloads</div>
         <div class="funnel-bar" style="width:${(f.downloads / f.impressions * 100).toFixed(1)}%;background:linear-gradient(90deg,#4ade80,#22c55e)">${f.downloads}</div>
         <div class="funnel-value">${dlPct}% of page views</div>
-      </div>`;
+      </div>`);
 
     // Charts
     const c = pp.charts;
@@ -381,7 +381,7 @@
           <tr><td>5.</td><td>Respond to any new reviews</td></tr>
           <tr><td>6.</td><td>Check MealSight review status</td></tr>
         </table>
-      </div>`;
+      </div>`);
 
     // === MEALSIGHT TAB ===
     if (ms.isLive) {
@@ -408,7 +408,7 @@
         <div class="strategy-section" style="margin-top:32px">
           <h2>Pre-Launch Checklist for MealSight</h2>
           <div class="strategy-grid">${(st.mealsightPreLaunch || []).map(strategyCard).join('')}</div>
-        </div>`;
+        </div>`);
     }
 
     // === STRATEGY TAB ===
@@ -422,7 +422,7 @@
       <h2 style="font-size:18px;font-weight:700;color:#facc15;margin-bottom:16px;">Medium-Term Plays (Next 2-4 Weeks)</h2>
       <div class="strategy-grid" style="margin-bottom:32px">${st.mediumTerm.map(strategyCard).join('')}</div>
       <h2 style="font-size:18px;font-weight:700;color:#4ade80;margin-bottom:16px;">Long-Term Vision (1-3 Months)</h2>
-      <div class="strategy-grid">${st.longTerm.map(strategyCard).join('')}</div>`;
+      <div class="strategy-grid">${st.longTerm.map(strategyCard).join('')}</div>`);
   }
 
   // Fetch and render
