@@ -215,7 +215,7 @@ def build_data_json(token):
         req = urllib.request.Request(gist_raw_url + f"?_={int(time.time())}")
         with urllib.request.urlopen(req) as resp:
             prev_data = json.loads(resp.read().decode())
-        prin  print("Loaded previous gist data as fallback")
+        print("Loaded previous gist data as fallback")
     except Exception as e:
         print(f"Could not fetch previous data: {e}", file=sys.stderr)
 
