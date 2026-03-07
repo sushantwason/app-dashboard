@@ -254,7 +254,7 @@
     const st = d.strategy;
 
     // Header
-    document.getElementById('dataPeriod').textContent = `Data period: ${d.dataPeriod} · Source: App Store Connect · Updated: ${new Date(d.lastUpdated).toLocaleString()}`;
+    document.getElementById('dataPeriod').textContent = `Data period: ${d.dataPeriod} \u00B7 Source: App Store Connect \u00B7 Updated: ${new Date(d.lastUpdated).toLocaleString()}`;
 
     // === PATCHPAL TAB ===
 
@@ -392,7 +392,7 @@
         `<div class="pending-panel">
           <div class="pending-icon">&#9203;</div>
           <h3>${ms.appName}</h3>
-          <p style="font-size:16px;margin-bottom:16px;">${ms.version} Ã¢ÂÂ ${ms.status}</p>
+          <p style="font-size:16px;margin-bottom:16px;">${ms.version} \u2014 ${ms.status}</p>
           <p>Submitted ${ms.submittedDate}. Apple typically reviews within 24-48 hours.</p>
           <div style="margin-top:24px;text-align:left;max-width:500px;margin-left:auto;margin-right:auto;">
             <table class="data-table">
