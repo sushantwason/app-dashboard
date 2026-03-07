@@ -17,7 +17,7 @@ import jwt  # PyJWT with cryptography backend
 KEY_ID = os.environ["ASC_KEY_ID"]
 ISSUER_ID = os.environ["ASC_ISSUER_ID"]
 PRIVATE_KEY = os.environ["ASC_PRIVATE_KEY"]
-GIST_ID = "a2883b884c26b0f4d910ff5a7acbf777"
+GIST_ID = "a4c54ade850bc740fdfe8bb583a85648"
 GIST_PAT = os.environ["GIST_PAT"]
 PATCHPAL_APP_ID = "6741104775"
 MEALSIGHT_APP_ID = "6743397801"
