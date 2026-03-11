@@ -8,6 +8,7 @@ import json
 import time
 import os
 import sys
+import base64
 import urllib.request
 import urllib.error
 from datetime import datetime, timedelta, timezone
@@ -23,6 +24,13 @@ PATCHPAL_APP_ID = "6741104775"
 MEALSIGHT_APP_ID = "6743397801"
 ANDROID_PATCHPAL_PACKAGE = "com.patchpal.app"
 BASE_URL = "https://api.appstoreconnect.apple.com"
+
+# TelemetryDeck Config
+TD_EMAIL = os.environ.get("TD_EMAIL")
+TD_PASSWORD = os.environ.get("TD_PASSWORD")
+TD_API_BASE = "https://api.telemetrydeck.com/api/v3"
+PATCHPAL_TD_APP_ID = "3204AD73-ECA9-476F-AA89-EAEA72F9D171"
+MEALSIGHT_TD_APP_ID = "0C01A41F-4719-4133-B543-3EA67EF0150F"
 
 def generate_jwt():
     """Generate App Store Connect JWT token."""
@@ -153,6 +161,293 @@ def fetch_android_info():
         "installs": 0,
         "source": "static"
     }
+
+
+# === TELEMETRYDECK INTEGRATION ===
+
+def td_login():
+    """Login to TelemetryDeck and return bearer token."""
+    if not TD_EMAIL or not TD_PASSWORD:
+        print("Warning: TelemetryDeck credentials not set. Skipping.")
+        return None
+
+    url = f"{TD_API_BASE}/users/login"
+    credentials = f"{TD_EMAIL}:{TD_PASSWORD}"
+    encoded = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
+
+    try:
+        req = urllib.request.Request(url, headers={
+            "Authorization": f"Basic {encoded}",
+            "Content-Type": "application/json"
+        }, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            token = data.get("value")
+            if token:
+                print("TelemetryDeck login successful")
+                return token
+            print("TelemetryDeck login failed: no token in response")
+            return None
+    except Exception as e:
+        print(f"TelemetryDeck login error: {e}", file=sys.stderr)
+        return None
+
+
+def td_query(token, query_json):
+    """Submit async query to TelemetryDeck and poll for results."""
+    if not token:
+        return None
+
+    url = f"{TD_API_BASE}/query/calculate-async/"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        req = urllib.request.Request(url, data=json.dumps(query_json).encode('utf-8'),
+                                     headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            task_id = data.get("queryTaskID") or data.get("id")
+            if not task_id:
+                print(f"TD query: no task ID in response: {data}")
+                return None
+    except Exception as e:
+        print(f"TD query submission error: {e}", file=sys.stderr)
+        return None
+
+    # Poll for completion
+    for _ in range(30):
+        time.sleep(1)
+        try:
+            req = urllib.request.Request(f"{TD_API_BASE}/task/{task_id}/status/", headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                status_data = json.loads(resp.read().decode('utf-8'))
+                status = status_data.get("status", "")
+
+                if status in ("successful", "DONE"):
+                    req2 = urllib.request.Request(f"{TD_API_BASE}/task/{task_id}/value/", headers=headers)
+                    with urllib.request.urlopen(req2, timeout=10) as resp2:
+                        return json.loads(resp2.read().decode('utf-8'))
+                elif status in ("failed", "FAILED"):
+                    print(f"TD query failed: {status_data}")
+                    return None
+        except Exception as e:
+            print(f"TD status check error: {e}", file=sys.stderr)
+            return None
+
+    print(f"TD query timeout for task {task_id}")
+    return None
+
+
+def _td_base_filter(app_id):
+    return {
+        "type": "and",
+        "fields": [
+            {"type": "selector", "dimension": "appID", "value": app_id},
+            {"type": "selector", "dimension": "isTestMode", "value": "false"}
+        ]
+    }
+
+
+def _td_interval_30d():
+    return [{"beginningDate": {"component": "day", "offset": -30, "position": "beginning"},
+             "endDate": {"component": "day", "offset": 0, "position": "end"}}]
+
+
+def _parse_topn_result(raw):
+    """Parse topN query result into labels and data arrays."""
+    labels, data = [], []
+    if not raw or "result" not in raw:
+        return labels, data
+    result = raw["result"]
+    # topN results come as rows with result arrays
+    rows = result.get("rows", result.get("events", []))
+    if rows and isinstance(rows, list):
+        for row in rows:
+            items = row.get("result", [row]) if isinstance(row, dict) else []
+            for item in (items if isinstance(items, list) else [items]):
+                if isinstance(item, dict):
+                    # Find the dimension key (not 'count' or 'eventCount')
+                    label = "Unknown"
+                    count = 0
+                    for k, v in item.items():
+                        if k in ("count", "eventCount"):
+                            count = int(v) if v else 0
+                        else:
+                            label = str(v)
+                    labels.append(label)
+                    data.append(count)
+    return labels, data
+
+
+def td_fetch_app_data(token, app_id):
+    """Fetch all TelemetryDeck analytics for a specific app."""
+    if not token:
+        return None
+
+    try:
+        result = {
+            "dau": [], "dau_dates": [],
+            "mau": 0, "totalSignals": 0, "sessions": 0,
+            "avgSessionsPerUser": 0,
+            "topDevices": {"labels": [], "data": []},
+            "osVersions": {"labels": [], "data": []},
+            "appVersions": {"labels": [], "data": []},
+            "topErrors": {"labels": [], "data": []},
+            "stickiness": 0
+        }
+
+        base_filter = _td_base_filter(app_id)
+        intervals = _td_interval_30d()
+
+        # 1. DAU timeseries
+        dau_raw = td_query(token, {
+            "queryType": "timeseries",
+            "dataSource": "telemetry-signals",
+            "aggregations": [{"type": "thetaSketch", "name": "count", "fieldName": "clientUser"}],
+            "filter": base_filter,
+            "granularity": "day",
+            "relativeIntervals": intervals
+        })
+        if dau_raw and "result" in dau_raw:
+            events = dau_raw["result"].get("rows", dau_raw["result"].get("events", []))
+            for ev in events:
+                ts = ev.get("timestamp", "")
+                c = ev.get("result", {}).get("count", 0) if isinstance(ev.get("result"), dict) else ev.get("count", 0)
+                result["dau"].append(int(c))
+                if ts:
+                    try:
+                        result["dau_dates"].append(datetime.fromisoformat(ts.replace('Z', '+00:00')).strftime('%Y-%m-%d'))
+                    except Exception:
+                        result["dau_dates"].append(ts[:10])
+
+        # 2. MAU (unique users, 30d)
+        mau_raw = td_query(token, {
+            "queryType": "timeseries",
+            "dataSource": "telemetry-signals",
+            "aggregations": [{"type": "thetaSketch", "name": "count", "fieldName": "clientUser"}],
+            "filter": base_filter,
+            "granularity": "all",
+            "relativeIntervals": intervals
+        })
+        if mau_raw and "result" in mau_raw:
+            events = mau_raw["result"].get("rows", mau_raw["result"].get("events", []))
+            if events:
+                result["mau"] = int(events[0].get("result", {}).get("count", 0) if isinstance(events[0].get("result"), dict) else events[0].get("count", 0))
+
+        # 3. Total signals
+        sig_raw = td_query(token, {
+            "queryType": "timeseries",
+            "dataSource": "telemetry-signals",
+            "aggregations": [{"type": "eventCount"}],
+            "filter": base_filter,
+            "granularity": "all",
+            "relativeIntervals": intervals
+        })
+        if sig_raw and "result" in sig_raw:
+            events = sig_raw["result"].get("rows", sig_raw["result"].get("events", []))
+            if events:
+                result["totalSignals"] = int(events[0].get("result", {}).get("eventCount", 0) if isinstance(events[0].get("result"), dict) else events[0].get("eventCount", 0))
+
+        # 4. Sessions (newSessionBegan signal type)
+        sess_raw = td_query(token, {
+            "queryType": "timeseries",
+            "dataSource": "telemetry-signals",
+            "aggregations": [{"type": "eventCount"}],
+            "filter": {"type": "and", "fields": [
+                {"type": "selector", "dimension": "appID", "value": app_id},
+                {"type": "selector", "dimension": "isTestMode", "value": "false"},
+                {"type": "selector", "dimension": "type", "value": "TelemetryDeck.Session.started"}
+            ]},
+            "granularity": "all",
+            "relativeIntervals": intervals
+        })
+        if sess_raw and "result" in sess_raw:
+            events = sess_raw["result"].get("rows", sess_raw["result"].get("events", []))
+            if events:
+                result["sessions"] = int(events[0].get("result", {}).get("eventCount", 0) if isinstance(events[0].get("result"), dict) else events[0].get("eventCount", 0))
+
+        # If sessions is 0, try alternative signal name
+        if result["sessions"] == 0:
+            sess_raw2 = td_query(token, {
+                "queryType": "timeseries",
+                "dataSource": "telemetry-signals",
+                "aggregations": [{"type": "eventCount"}],
+                "filter": {"type": "and", "fields": [
+                    {"type": "selector", "dimension": "appID", "value": app_id},
+                    {"type": "selector", "dimension": "isTestMode", "value": "false"},
+                    {"type": "selector", "dimension": "type", "value": "newSessionBegan"}
+                ]},
+                "granularity": "all",
+                "relativeIntervals": intervals
+            })
+            if sess_raw2 and "result" in sess_raw2:
+                events = sess_raw2["result"].get("rows", sess_raw2["result"].get("events", []))
+                if events:
+                    result["sessions"] = int(events[0].get("result", {}).get("eventCount", 0) if isinstance(events[0].get("result"), dict) else events[0].get("eventCount", 0))
+
+        if result["mau"] > 0:
+            result["avgSessionsPerUser"] = round(safe_div(result["sessions"], result["mau"]), 1)
+
+        # 5. Top devices
+        dev_raw = td_query(token, {
+            "queryType": "topN",
+            "dataSource": "telemetry-signals",
+            "aggregations": [{"type": "thetaSketch", "name": "count", "fieldName": "clientUser"}],
+            "dimension": {"type": "default", "dimension": "TelemetryDeck.Device.modelName", "outputName": "modelName"},
+            "filter": base_filter,
+            "granularity": "all",
+            "metric": {"type": "numeric", "metric": "count"},
+            "threshold": 5,
+            "relativeIntervals": intervals
+        })
+        labels, data = _parse_topn_result(dev_raw)
+        result["topDevices"] = {"labels": labels, "data": data}
+
+        # 6. OS versions
+        os_raw = td_query(token, {
+            "queryType": "topN",
+            "dataSource": "telemetry-signals",
+            "aggregations": [{"type": "thetaSketch", "name": "count", "fieldName": "clientUser"}],
+            "dimension": {"type": "default", "dimension": "TelemetryDeck.Device.systemMajorMinorVersion", "outputName": "osVersion"},
+            "filter": base_filter,
+            "granularity": "all",
+            "metric": {"type": "numeric", "metric": "count"},
+            "threshold": 5,
+            "relativeIntervals": intervals
+        })
+        labels, data = _parse_topn_result(os_raw)
+        result["osVersions"] = {"labels": labels, "data": data}
+
+        # 7. App versions
+        ver_raw = td_query(token, {
+            "queryType": "topN",
+            "dataSource": "telemetry-signals",
+            "aggregations": [{"type": "thetaSketch", "name": "count", "fieldName": "clientUser"}],
+            "dimension": {"type": "default", "dimension": "TelemetryDeck.AppInfo.version", "outputName": "appVersion"},
+            "filter": base_filter,
+            "granularity": "all",
+            "metric": {"type": "numeric", "metric": "count"},
+            "threshold": 5,
+            "relativeIntervals": intervals
+        })
+        labels, data = _parse_topn_result(ver_raw)
+        result["appVersions"] = {"labels": labels, "data": data}
+
+        # 8. Stickiness
+        if result["mau"] > 0 and result["dau"]:
+            avg_dau = sum(result["dau"]) / len(result["dau"])
+            result["stickiness"] = round(avg_dau / result["mau"] * 100, 1)
+
+        print(f"  TD app {app_id[:8]}: MAU={result['mau']}, signals={result['totalSignals']}, sessions={result['sessions']}")
+        return result
+
+    except Exception as e:
+        print(f"TD fetch error for {app_id}: {e}", file=sys.stderr)
+        return None
+
 
 def build_data_json(token):
     """Build the complete data.json structure."""
@@ -370,6 +665,17 @@ def build_data_json(token):
             },
         }
 
+    # === Fetch TelemetryDeck data ===
+    td_token = td_login()
+    if td_token:
+        pp_td = td_fetch_app_data(td_token, PATCHPAL_TD_APP_ID)
+        if pp_td:
+            data["patchpal"]["telemetry"] = pp_td
+
+        ms_td = td_fetch_app_data(td_token, MEALSIGHT_TD_APP_ID)
+        if ms_td:
+            data["mealsight"]["telemetry"] = ms_td
+
     return data
 
 def update_gist(data_json):
@@ -409,6 +715,8 @@ def generate_email_html(data):
     ms = data.get("mealsight", {})
     android = data.get("android_patchpal", {})
     strategy = data.get("strategy", {})
+    pp_td = pp.get("telemetry")
+    ms_td = ms.get("telemetry")
 
     def metric_color(change_str):
         if not change_str or change_str == "0%":
@@ -666,6 +974,49 @@ def generate_email_html(data):
     <p style="font-size:13px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px;">Top Priorities</p>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.02);border-radius:12px;overflow:hidden;">
       {priority_rows}
+    </table>
+  </td></tr>'''}
+
+  <!-- TELEMETRYDECK ANALYTICS -->
+  {"" if not pp_td and not ms_td else f'''<tr><td style="background:#0d0d20;padding:0 30px 24px;">
+    <p style="font-size:13px;font-weight:600;color:#a78bfa;text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px;">TelemetryDeck &mdash; Real Usage Analytics (30d)</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:rgba(255,255,255,0.02);border-radius:12px;overflow:hidden;">
+    {"" if not pp_td else f"""<tr>
+      <td style="padding:12px 16px;border-bottom:1px solid #1a1a3e;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">PatchPal MAU</span><br>
+        <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{pp_td.get('mau', 0)}</span>
+      </td>
+      <td style="padding:12px 16px;border-bottom:1px solid #1a1a3e;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Sessions</span><br>
+        <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{pp_td.get('sessions', 0)}</span>
+      </td>
+      <td style="padding:12px 16px;border-bottom:1px solid #1a1a3e;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Signals</span><br>
+        <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{pp_td.get('totalSignals', 0)}</span>
+      </td>
+      <td style="padding:12px 16px;border-bottom:1px solid #1a1a3e;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Stickiness</span><br>
+        <span style="font-size:24px;font-weight:700;color:#4ade80;">{pp_td.get('stickiness', 0)}%</span>
+      </td>
+    </tr>"""}
+    {"" if not ms_td else f"""<tr>
+      <td style="padding:12px 16px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">MealSight MAU</span><br>
+        <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{ms_td.get('mau', 0)}</span>
+      </td>
+      <td style="padding:12px 16px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Sessions</span><br>
+        <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{ms_td.get('sessions', 0)}</span>
+      </td>
+      <td style="padding:12px 16px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Signals</span><br>
+        <span style="font-size:24px;font-weight:700;color:#f0f0ff;">{ms_td.get('totalSignals', 0)}</span>
+      </td>
+      <td style="padding:12px 16px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#8888aa;">Stickiness</span><br>
+        <span style="font-size:24px;font-weight:700;color:#4ade80;">{ms_td.get('stickiness', 0)}%</span>
+      </td>
+    </tr>"""}
     </table>
   </td></tr>'''}
 

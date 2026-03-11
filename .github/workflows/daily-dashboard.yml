@@ -28,6 +28,8 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           GIST_PAT: ${{ secrets.GIST_PAT }}
+          TD_EMAIL: ${{ secrets.TD_EMAIL }}
+          TD_PASSWORD: ${{ secrets.TD_PASSWORD }}
         run: python scripts/update_dashboard.py
 
       - name: Get current date

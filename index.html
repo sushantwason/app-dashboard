@@ -99,7 +99,13 @@
   .loading p { color: #8888aa; font-size: 14px; }
   .error-msg { color: #f87171; text-align: center; padding: 40px; font-size: 14px; }
 
+  /* Section Headings */
+  .section-heading { font-size: 16px; font-weight: 700; color: #c0c0dd; margin: 32px 0 16px; display: flex; align-items: center; gap: 10px; }
+  .section-heading .badge { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; padding: 3px 10px; border-radius: 20px; background: rgba(124,140,248,0.12); color: #7c8cf8; font-weight: 600; }
+  .td-metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+
   @media (max-width: 900px) {
+    .td-metric-grid { grid-template-columns: repeat(2, 1fr); }
     .metric-grid { grid-template-columns: repeat(2, 1fr); }
     .chart-row, .status-row, .strategy-grid { grid-template-columns: 1fr; }
     .container { padding: 20px; }
@@ -116,7 +122,7 @@
   </div>
   <div style="text-align:right">
     <div style="font-size:13px;color:#8888aa;">Sushant Wason</div>
-    <div style="font-size:11px;color:#666680;">App Store Connect</div>
+    <div style="font-size:11px;color:#666680;">App Store Connect + TelemetryDeck</div>
   </div>
 </div>
 
@@ -183,12 +189,63 @@
       </div>
     </div>
 
+    <!-- TelemetryDeck Section -->
+    <div id="pp-td-section" style="display:none">
+      <div class="section-heading">TelemetryDeck Analytics <span class="badge">Last 30 Days</span></div>
+      <div class="td-metric-grid" id="pp-td-metrics"></div>
+      <div class="chart-row">
+        <div class="chart-card">
+          <h3>Daily Active Users (TelemetryDeck)</h3>
+          <canvas id="ppDauChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Top Devices</h3>
+          <canvas id="ppDevicesChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-row">
+        <div class="chart-card">
+          <h3>OS Version Distribution</h3>
+          <canvas id="ppOsChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>App Version Distribution</h3>
+          <canvas id="ppVersionChart"></canvas>
+        </div>
+      </div>
+    </div>
+
     <!-- App Status -->
     <div class="status-row" id="statusRow"></div>
   </div>
 
   <!-- ============ MEALSIGHT TAB ============ -->
   <div class="tab-content" id="tab-mealsight"></div>
+  <!-- MealSight TD charts (rendered dynamically, placed outside tab-mealsight to avoid innerHTML overwrite) -->
+  <div id="ms-td-section" style="display:none">
+    <div class="section-heading">TelemetryDeck Analytics <span class="badge">Last 30 Days</span></div>
+    <div class="td-metric-grid" id="ms-td-metrics"></div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>Daily Active Users (TelemetryDeck)</h3>
+        <canvas id="msDauChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Top Devices</h3>
+        <canvas id="msDevicesChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>OS Version Distribution</h3>
+        <canvas id="msOsChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>App Version Distribution</h3>
+        <canvas id="msVersionChart"></canvas>
+      </div>
+    </div>
+  </div>
 
   <!-- ============ STRATEGY TAB ============ -->
   <div class="tab-content" id="tab-strategy"></div>
@@ -207,6 +264,11 @@
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
     event.target.classList.add('active');
+    // Show/hide MealSight TD section with its tab
+    const msTd = document.getElementById('ms-td-section');
+    if (msTd && msTd.dataset.ready) {
+      msTd.style.display = (tab === 'mealsight') ? 'block' : 'none';
+    }
   }
 
   // Chart.js defaults
@@ -248,13 +310,68 @@
     </div>`;
   }
 
+  const tdChartColors = ['#7c8cf8','#a78bfa','#4ade80','#38bdf8','#facc15','#f87171','#c084fc','#22d3ee'];
+
+  function renderTdSection(td, prefix) {
+    if (!td) return;
+    const section = document.getElementById(prefix + '-td-section');
+    section.style.display = 'block';
+    section.dataset.ready = '1';
+
+    // Metric cards
+    safeHTML(document.getElementById(prefix + '-td-metrics'),
+      metricCard('Monthly Active Users', (td.mau || 0).toLocaleString(), '', '', '#a78bfa') +
+      metricCard('Sessions (30d)', (td.sessions || 0).toLocaleString(), '', '', '#4ade80') +
+      metricCard('Total Signals', (td.totalSignals || 0).toLocaleString(), '', '', '#38bdf8') +
+      metricCard('Stickiness (DAU/MAU)', (td.stickiness || 0) + '%', '', 'Avg sessions/user: ' + (td.avgSessionsPerUser || 0).toFixed(1), '#facc15'));
+
+    // DAU Chart
+    if (td.dau && td.dau.length > 0) {
+      new Chart(document.getElementById(prefix + 'DauChart'), {
+        type: 'line',
+        data: {
+          labels: (td.dau_dates || []).map(d => d.slice(5)),
+          datasets: [{ label: 'DAU', data: td.dau, borderColor: '#7c8cf8', backgroundColor: 'rgba(124,140,248,0.1)', fill: true, tension: 0.3, pointRadius: 1 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.03)' } }, x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } } } }
+      });
+    }
+
+    // Top Devices
+    if (td.topDevices && td.topDevices.labels.length > 0) {
+      new Chart(document.getElementById(prefix + 'DevicesChart'), {
+        type: 'doughnut',
+        data: { labels: td.topDevices.labels, datasets: [{ data: td.topDevices.data, backgroundColor: tdChartColors.slice(0, td.topDevices.labels.length), borderWidth: 0 }] },
+        options: { responsive: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } } } }
+      });
+    }
+
+    // OS Versions
+    if (td.osVersions && td.osVersions.labels.length > 0) {
+      new Chart(document.getElementById(prefix + 'OsChart'), {
+        type: 'bar',
+        data: { labels: td.osVersions.labels, datasets: [{ label: 'Users', data: td.osVersions.data, backgroundColor: tdChartColors.slice(0, td.osVersions.labels.length), borderRadius: 6, barThickness: 28 }] },
+        options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.03)' } }, y: { grid: { display: false } } } }
+      });
+    }
+
+    // App Versions
+    if (td.appVersions && td.appVersions.labels.length > 0) {
+      new Chart(document.getElementById(prefix + 'VersionChart'), {
+        type: 'doughnut',
+        data: { labels: td.appVersions.labels, datasets: [{ data: td.appVersions.data, backgroundColor: tdChartColors.slice(0, td.appVersions.labels.length), borderWidth: 0 }] },
+        options: { responsive: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 10, font: { size: 11 } } } } }
+      });
+    }
+  }
+
   function renderDashboard(d) {
     const pp = d.patchpal;
     const ms = d.mealsight;
     const st = d.strategy;
 
     // Header
-    document.getElementById('dataPeriod').textContent = `Data period: ${d.dataPeriod} \u00B7 Source: App Store Connect \u00B7 Updated: ${new Date(d.lastUpdated).toLocaleString()}`;
+    document.getElementById('dataPeriod').textContent = `Data period: ${d.dataPeriod} \u00B7 Source: App Store Connect + TelemetryDeck \u00B7 Updated: ${new Date(d.lastUpdated).toLocaleString()}`;
 
     // === PATCHPAL TAB ===
 
@@ -282,7 +399,7 @@
         <div class="metric-label">Avg Session Duration</div>
         <div class="metric-value" style="font-size:22px;color:#666680">&mdash;</div>
         <div class="metric-change neutral">Not available</div>
-        <div class="metric-sub">Requires Firebase / Mixpanel SDK</div>
+        <div class="metric-sub">See TelemetryDeck section below</div>
       </div>`);
 
     // Key Insight
@@ -383,6 +500,9 @@
         </table>
       </div>`);
 
+    // === PATCHPAL TELEMETRYDECK ===
+    if (pp.telemetry) { renderTdSection(pp.telemetry, 'pp'); }
+
     // === MEALSIGHT TAB ===
     if (ms.isLive) {
       safeHTML(document.getElementById('tab-mealsight'), '<div class="insight-callout"><h3>MealSight is Live!</h3><p>Analytics data will appear here once sufficient data is collected.</p></div>');
@@ -410,6 +530,9 @@
           <div class="strategy-grid">${(st.mealsightPreLaunch || []).map(strategyCard).join('')}</div>
         </div>`);
     }
+
+    // === MEALSIGHT TELEMETRYDECK ===
+    if (ms.telemetry) { renderTdSection(ms.telemetry, 'ms'); }
 
     // === STRATEGY TAB ===
     safeHTML(document.getElementById('tab-strategy'),
