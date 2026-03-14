@@ -461,6 +461,16 @@ def build_data_json(token):
     pp_info = fetch_app_info(token, PATCHPAL_APP_ID)
     ms_info = fetch_app_info(token, MEALSIGHT_APP_ID)
 
+    # Debug: log MealSight API response
+    if ms_info is None:
+        print("WARNING: MealSight API call returned None - check API credentials/app ID", file=sys.stderr)
+    elif "included" not in ms_info:
+        print(f"WARNING: MealSight API response has no 'included' data. Keys: {list(ms_info.keys())}", file=sys.stderr)
+        print(f"MealSight API response (truncated): {json.dumps(ms_info, indent=2)[:500]}", file=sys.stderr)
+    else:
+        ms_version_states = [v.get("attributes", {}).get("appVersionState", "") or v.get("attributes", {}).get("appStoreState", "") for v in ms_info["included"] if v["type"] == "appStoreVersions"]
+        print(f"MealSight version states from API: {ms_version_states}")
+
     # Try to get analytics reports
     pp_reports = fetch_sales_reports(token, PATCHPAL_APP_ID, start_date, end_date)
 
@@ -525,6 +535,13 @@ def build_data_json(token):
                 "PENDING_APPLE_RELEASE": "Pending Apple Release",
             }
             ms_status = status_map.get(state, state)
+        else:
+            # Catch any unrecognized state so it doesn't silently stay as "Unknown"
+            print(f"WARNING: MealSight has unrecognized state '{state}' for version {version}", file=sys.stderr)
+            ms_version = version
+            ms_status = state.replace("_", " ").title()
+
+    print(f"MealSight final status: isLive={ms_is_live}, status='{ms_status}', version='{ms_version}'")
 
     # Try to fetch analytics data via the reports API
     analytics_data = None
