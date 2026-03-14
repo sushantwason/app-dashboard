@@ -507,12 +507,22 @@ def build_data_json(token):
             ms_is_live = True
             ms_version = version
             ms_status = "Ready for Sale"
-        elif state in ("WAITING_FOR_REVIEW", "IN_REVIEW", "PREPARE_FOR_SUBMISSION"):
+        elif state in ("WAITING_FOR_REVIEW", "IN_REVIEW", "PREPARE_FOR_SUBMISSION",
+                        "REJECTED", "DEVELOPER_REJECTED", "METADATA_REJECTED",
+                        "INVALID_BINARY", "PENDING_DEVELOPER_RELEASE",
+                        "PROCESSING_FOR_APP_STORE", "PENDING_APPLE_RELEASE"):
             ms_version = version
             status_map = {
                 "PREPARE_FOR_SUBMISSION": "Prepare for Submission",
                 "WAITING_FOR_REVIEW": "Waiting for Review",
                 "IN_REVIEW": "In Review",
+                "REJECTED": "Rejected",
+                "DEVELOPER_REJECTED": "Developer Rejected",
+                "METADATA_REJECTED": "Metadata Rejected",
+                "INVALID_BINARY": "Invalid Binary",
+                "PENDING_DEVELOPER_RELEASE": "Pending Developer Release",
+                "PROCESSING_FOR_APP_STORE": "Processing for App Store",
+                "PENDING_APPLE_RELEASE": "Pending Apple Release",
             }
             ms_status = status_map.get(state, state)
 
